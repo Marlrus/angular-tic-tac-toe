@@ -299,3 +299,28 @@ And to the board component:
   Start new Game
 </button>
 ```
+
+## PWA
+
+We run: `ng add @angular/pwa` to install the package. This sets up the new module to the module file of our app:
+
+```typescript
+import { ServiceWorkerModule } from '@angular/service-worker';
+import { environment } from '../environments/environment';
+
+ServiceWorkerModule.register('ngsw-worker.js', { enabled: environment.production }),
+```
+
+And creates the **ngsw-config.json** file which allows us to configure the service worker. It also creates the manifest and adds the icons for the manifest and installation.
+
+Since PWA is a production feature we need to bulid the app which is done with `ng build`
+
+### Running locally
+
+The tutorial suggested we host the app, I used the **lite-server** package to run the app. To do this, we must go to dist/tic-tac-toe-angular which was created at build and then run `lite-server`. The app worked correctly.
+
+Unfortunately, since we are not hosting, the app is basically unfit for PWA installation due to HTTPS and not being able to load the service-worker. It seemed like a good idea, but the execution didn't work as expected.
+
+### PWA problems
+
+After running this command my app completely died. Nb components were not detected and the app just died. Restarting the server fixed it.
