@@ -34,6 +34,10 @@ Contains the styling for the component, this file is **scoped** to the component
 
 We will delete all of the boilerplate in the component.html file. We delete the 500+ lines and just leave the **router-outlet** component on which allows us to map components to routes. This component can also handle _code splitting and lazy loading_ out of the bat, like NextJS and unlike CRA.
 
+### VIM integration
+
+I browsed for the LSP and found it: `npm install -g @angular/language-server` and adding it to the list of servers: `local servers = {'jsonls', 'tsserver', 'cssls', 'html', 'graphql', 'yamlls', 'bashls', 'vimls', 'ngserver' }`
+
 ## Creating a Component
 
 We can create a component using the CLI command `ng generate component <name> [options]`, the shorthand for generate is **g**. We run: `ng g component square --inline-style --inline-template`
@@ -87,6 +91,8 @@ At the moment we only have an @Input in our component, and it doesn't have a way
 
 ## Board Component
 
+This component is our **smart** component, meaning that it has internal state that can change.
+
 We create a new board component to manage the state that will be used in the SquareComponent. Here we will just use the default options in the creation.
 
 Since we didn't set the flags we had before, we can see that this component has paths to the template and styles:
@@ -106,8 +112,190 @@ export class BoardComponent implements OnInit {
 }
 ```
 
-This component is our **smart** component, meaning that it has internal state that can change.
+Inside our class we add properties that we are going to use. Im getting tons of warnings and changing my tsconfig file does absolutely nothing to it unfortunately. One solution was to add ! or ?, for this case I will go with !.
 
-### VIM integration
+```typescript
+  squares!: any[];
+  xIsNext!: boolean;
+  winner!: string | null;
+```
 
-I browsed for the LSP and found it: `npm install -g @angular/language-server` and adding it to the list of servers: `local servers = {'jsonls', 'tsserver', 'cssls', 'html', 'graphql', 'yamlls', 'bashls', 'vimls', 'ngserver' }`
+We will use ngOnInit this time, which is the equivalent of React's **useEffect** hook.
+
+```typescript
+  ngOnInit(): void {
+    this.newGame();
+  }
+
+  newGame() {
+    this.squares = Array(9).fill(null);
+    this.winner = null;
+    this.xIsNext = true;
+  }
+```
+
+Here we will give the component its initial state.
+
+### Computed properties
+
+We can derive propeties from other state to use in our component. In this case we know what user is next depending on the xIsNext value but it is a boolean. We can compute the current user using that boolean and a TS getter:
+
+```typescript
+  get player() {
+    return this.xIsNext ? 'X' : 'O';
+  }
+```
+
+### Tic tac toe logic
+
+We want to have a handler for the logic of the game, we call it **makeMove**. Here we will see if someone has won, if the square being touched has been chosen already and if the player changes.
+
+```typescript
+  makeMove(i: number) {
+    if (this.squares[i]) return;
+
+    // replace value at existing spot with current player
+    this.squares.splice(i, 1, this.player);
+    this.xIsNext = !this.xIsNext;
+
+    this.winner = this.calculateWinner();
+  }
+
+  calculateWinner() {
+    const lines = [
+      [0, 1, 2],
+      [3, 4, 5],
+      [6, 7, 8],
+      [0, 3, 6],
+      [1, 4, 7],
+      [2, 5, 8],
+      [0, 4, 8],
+      [2, 4, 6],
+    ];
+    for (let i = 0; i < lines.length; i++) {
+      const [a, b, c] = lines[i];
+      if (
+        this.squares[a] &&
+        this.squares[a] === this.squares[b] &&
+        this.squares[a] === this.squares[c]
+      ) {
+        return this.squares[a];
+      }
+    }
+    return null;
+  }
+```
+
+## Binding data to HTML
+
+We go into the board.component.html and here we create the HTML template, accessing the properties with the handlebar syntax. To execute methods from our class we can use events with parenthesis:
+
+```html
+<button (click)="newGame()">Start new Game</button>
+```
+
+This will execute newGame() when we click this button.
+
+### Structural Directive
+
+These handle things like conditional rendering. We will use **ngIf** to conditionally render the winner text, `*ngIf` displays if the condition on the right hand side is true:
+
+```html
+<h2 *ngIf="winner">Player {{ winner }} won the game!</h2>
+```
+
+This is the equivalent of using && or a ternary in React.
+
+The other common directive is `*ngFor` which is equivalent to using **map** in React.
+
+```html
+<main>
+  <app-square
+    *ngFor="let val of squares; let i = index"
+    [value]="val"
+    (click)="makeMove(i)"
+  >
+  </app-square>
+</main>
+```
+
+Here we declare in the directive that val will be the value of each square, and i will be the index. We access the value and use our handler using the index.
+
+### Style
+
+```scss
+app-square {
+  border: 1px gray solid;
+  height: 200px;
+}
+```
+
+Here we see that we can target our component directly as if it were a native html tag. We create a grid of 3 200px columns.
+
+Once that is done I adjusted the square component and app.component.html to use board. This gives us the working app with _some_ styling to have the basics done.
+
+## UI Library: Nebular
+
+To install the ui kit from nebular we have to run `ng add @nebular/theme` which is like Angular's own package manager.
+
+This command installs and configures nebular in our project, we are asked what theme we want and then if we want to add custom styling and animations. This is actually quite impressive and I've not seen something like this for React beyond the npx project creations for the different frameworks.
+
+This command creates a **themes.scss** file in our environment/ directory. Here we can customize the variables used in the theme. We can also go to the **app.module.ts** and see that there are some new modules in the @NgModule decorator. This allows us to use angular in a _progressive_ way, especially using the parts of the framework that we actually need.
+
+In this file we will import the NbButtonModule which we then need to add to the imports Array:
+
+```typescript
+import { NbThemeModule, NbLayoutModule, NbButtonModule } from "@nebular/theme";
+
+@NgModule({
+  declarations: [AppComponent, SquareComponent, BoardComponent],
+  imports: [
+    BrowserModule,
+    AppRoutingModule,
+    BrowserAnimationsModule,
+    NbThemeModule.forRoot({ name: "cosmic" }),
+    NbLayoutModule,
+    NbEvaIconsModule,
+    NbButtonModule,
+  ],
+  providers: [],
+  bootstrap: [AppComponent],
+})
+export class AppModule {}
+```
+
+We now have access to these components in our app.
+
+#### Difference from React
+
+This is actually quite interesting because in React we import components on a Component to Component basis, which greatly differs. This is probably possible in Angular but we might be missing out on the benefits of the @NgModule decorator.
+
+### Changes in our app.component.html
+
+This installation added some components into our app html component automatically, which is pretty nuts. If we open the app, it looks better just with having run that command.
+
+## Changing Square style
+
+We now have access to a new **directive** called nbButton which in itself gives us access to other **directives** (props) that will change the appearance and can be seen in the docs for nebular. We add these to the template we have in square:
+
+```typescript
+  template: `
+    <button nbButton status="success" *ngIf="!value">{{ value }}</button>
+    <button nbButton hero status="success" *ngIf="value == 'X'">
+      {{ value }}
+    </button>
+    <button nbButton hero status="info" *ngIf="value == 'O'">
+      {{ value }}
+    </button>
+  `,
+```
+
+I had to add the success status to get better styling because Nebular's default button is plain.
+
+And to the board component:
+
+```typescript
+<button nbButton outline status="danger" (click)="newGame()">
+  Start new Game
+</button>
+```
